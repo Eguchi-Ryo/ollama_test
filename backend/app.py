@@ -50,21 +50,31 @@ def chat():
         if function_type == 'chatbot':
             # 質問に関連するドキュメントを検索
             search_results = document_search.search(message, max_results=3)
-            sources = [
-                {
-                    'title': result['title'],
-                    'content': result['content'][:300] + '...' if len(result['content']) > 300 else result['content'],
-                    'line': result.get('line', 0)
-                }
-                for result in search_results
-            ]
+            sources = []
+            for result in search_results:
+                # ファイル全体が返された場合はそのまま、部分の場合は要約
+                content = result['content']
+                if len(content) > 500:
+                    # 長い場合は最初の部分と最後の部分を表示
+                    sources.append({
+                        'title': result['title'],
+                        'content': content[:400] + '\n\n... (中略) ...\n\n' + content[-200:],
+                        'line': result.get('line', 0),
+                        'full_content': content  # 完全な内容も保持
+                    })
+                else:
+                    sources.append({
+                        'title': result['title'],
+                        'content': content,
+                        'line': result.get('line', 0)
+                    })
             
             # 検索結果をコンテキストに含めて質問を拡張
             if sources:
-                context = "\n\n参照ドキュメント:\n"
+                context = "以下のドキュメントの内容を参照してください:\n\n"
                 for i, source in enumerate(sources, 1):
-                    context += f"{i}. {source['title']}:\n{source['content']}\n\n"
-                enhanced_message = f"{context}\n質問: {message}\n\n上記のドキュメントを参照しながら回答してください。"
+                    context += f"【{source['title']}】\n{source['content']}\n\n"
+                enhanced_message = f"{context}質問: {message}\n\n上記のドキュメントの内容に基づいて、質問に日本語で回答してください。ドキュメントに記載されていない内容については推測せず、「ドキュメントに記載がありません」と答えてください。"
             else:
                 enhanced_message = message
         else:
@@ -117,6 +127,37 @@ def reload_documents():
         return jsonify({'success': True, 'message': 'ドキュメントを再読み込みしました'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/documents/<filename>', methods=['GET'])
+def get_document(filename):
+    """ドキュメントの内容を取得"""
+    import urllib.parse
+    
+    # セキュリティ: パストラバーサル攻撃を防ぐ
+    filename = os.path.basename(filename)
+    filepath = os.path.join(docs_dir, filename)
+    
+    # 親ディレクトリへの移動を防ぐ
+    if not os.path.abspath(filepath).startswith(os.path.abspath(docs_dir)):
+        return jsonify({'error': 'Invalid file path'}), 400
+    
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File not found'}), 404
+    
+    if not filename.endswith(('.txt', '.md')):
+        return jsonify({'error': 'Unsupported file type'}), 400
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'content': content
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

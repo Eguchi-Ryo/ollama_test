@@ -187,7 +187,23 @@ async function loadDocuments() {
             data.documents.forEach(doc => {
                 const docDiv = document.createElement('div');
                 docDiv.className = 'document-item';
-                docDiv.textContent = doc.name;
+                
+                // ファイル名とアイコンを表示
+                const docName = document.createElement('span');
+                docName.textContent = doc.name;
+                docDiv.appendChild(docName);
+                
+                // 表示ボタンを追加
+                const viewBtn = document.createElement('button');
+                viewBtn.className = 'view-doc-btn';
+                viewBtn.textContent = '表示';
+                viewBtn.title = '別ウィンドウで表示';
+                viewBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // 親要素のクリックイベントを防ぐ
+                    viewDocument(doc.name);
+                });
+                docDiv.appendChild(viewBtn);
+                
                 docDiv.addEventListener('click', () => {
                     document.querySelectorAll('.document-item').forEach(item => {
                         item.classList.remove('selected');
@@ -216,6 +232,68 @@ uploadBtn.addEventListener('click', () => {
     alert(`${files.length}個のファイルが選択されました（デモモード）`);
     fileInput.value = '';
 });
+
+// ドキュメントを別ウィンドウで表示
+async function viewDocument(filename) {
+    try {
+        const response = await fetch(`/api/documents/${encodeURIComponent(filename)}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // 新しいウィンドウを開く
+            const newWindow = window.open('', '_blank', 'width=800,height=600');
+            newWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="ja">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>${data.filename}</title>
+                    <style>
+                        body {
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            max-width: 800px;
+                            margin: 0 auto;
+                            padding: 2rem;
+                            line-height: 1.6;
+                            background-color: #f5f5f5;
+                        }
+                        h1 {
+                            color: #2c3e50;
+                            border-bottom: 2px solid #3498db;
+                            padding-bottom: 0.5rem;
+                        }
+                        pre {
+                            background-color: #fff;
+                            padding: 1rem;
+                            border-radius: 4px;
+                            border: 1px solid #ddd;
+                            overflow-x: auto;
+                            white-space: pre-wrap;
+                            word-wrap: break-word;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>${data.filename}</h1>
+                    <pre>${escapeHtml(data.content)}</pre>
+                </body>
+                </html>
+            `);
+            newWindow.document.close();
+        } else {
+            alert('ドキュメントの読み込みに失敗しました: ' + (data.error || '不明なエラー'));
+        }
+    } catch (error) {
+        alert('エラーが発生しました: ' + error.message);
+    }
+}
+
+// HTMLエスケープ関数
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {

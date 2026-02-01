@@ -45,11 +45,25 @@ class DocumentSearch:
         if not query or not self.documents_cache:
             return []
         
+        # ファイル名の完全一致をチェック（「○○について教えて」などのパターン）
+        query_lower = query.lower()
+        for filename, doc_data in self.documents_cache.items():
+            filename_lower = filename.lower()
+            filename_base = filename_lower.replace('.txt', '').replace('.md', '')
+            
+            # ファイル名が質問に含まれている場合、そのファイル全体を返す
+            if filename_base in query_lower or filename_lower in query_lower:
+                return [{
+                    'title': doc_data['name'],
+                    'content': doc_data['content'],  # ファイル全体
+                    'line': 1,
+                    'score': 1000  # 最高スコア
+                }]
+        
         # クエリをキーワードに分割（日本語も含む）
-        # 日本語文字列も検出できるように改善
         keywords = []
         # 英数字の単語
-        keywords.extend(re.findall(r'\w+', query.lower()))
+        keywords.extend(re.findall(r'\w+', query_lower))
         # 日本語の文字列（2文字以上）
         keywords.extend(re.findall(r'[ぁ-んァ-ヶー一-龠々]+', query))
         
@@ -88,4 +102,29 @@ class DocumentSearch:
                         end = min(len(lines), i + 3)
                         context = '\n'.join(lines[start:end])
                         relevant_lines.append({
-          
+                            'line': i + 1,
+                            'content': context.strip(),
+                            'match_line': i + 1
+                        })
+                
+                if relevant_lines:
+                    # 最も関連性の高い部分を選択（複数ある場合は最初の数個）
+                    for match in relevant_lines[:2]:  # 各ドキュメントから最大2箇所
+                        results.append({
+                            'title': doc_data['name'],
+                            'content': match['content'],
+                            'line': match['line'],
+                            'score': total_score
+                        })
+        
+        # スコアでソート
+        results.sort(key=lambda x: x['score'], reverse=True)
+        
+        # 最大結果数まで返す
+        return results[:max_results]
+    
+    def reload(self):
+        """ドキュメントを再読み込み"""
+        self.documents_cache = {}
+        self._load_documents()
+

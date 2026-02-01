@@ -203,9 +203,9 @@ class OllamaClient:
     
     def chat(self, message):
         """チャットボット機能"""
-        system_prompt = "あなたは製造現場の熟練作業員のノウハウを継承するAIアシスタントです。社内ドキュメントを参照しながら、質問に答えてください。必ず日本語で回答してください。"
-        prompt = f"質問: {message}\n\n回答（日本語で）:"
-        return self._run_ollama(prompt, system_prompt)
+        system_prompt = "あなたは製造現場の熟練作業員のノウハウを継承するAIアシスタントです。提供されたドキュメントの内容を正確に理解し、その内容に基づいて質問に答えてください。必ず日本語で回答してください。ドキュメントに記載されていない内容については推測せず、正直に「ドキュメントに記載がありません」と答えてください。"
+        # メッセージに既にコンテキストが含まれている場合はそのまま使用
+        return self._run_ollama(message, system_prompt)
     
     def generate_daily_report(self, input_data):
         """日報生成機能"""
