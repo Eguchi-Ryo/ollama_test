@@ -15,23 +15,37 @@ static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 CORS(app)
 
+# 環境判定
+IS_VERCEL = os.getenv('VERCEL') == '1'
+
 # Ollamaクライアントの初期化
-ollama_path = r"C:\Users\e9uch\AppData\Local\Programs\Ollama\ollama.exe"
-ollama_client = OllamaClient(ollama_path)
+if IS_VERCEL:
+    # Vercel環境: 外部Ollamaサーバーを使用
+    ollama_api_url = os.getenv('OLLAMA_API_URL', 'http://localhost:11434')
+    ollama_client = OllamaClient(None, api_url=ollama_api_url)
+    print(f"Vercel環境: Ollama API URL = {ollama_api_url}")
+else:
+    # ローカル環境
+    ollama_path = r"C:\Users\e9uch\AppData\Local\Programs\Ollama\ollama.exe"
+    ollama_client = OllamaClient(ollama_path)
+    print("ローカル環境: ローカルのOllamaを使用")
 
 # ドキュメント検索の初期化
 docs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'docs')
 document_search = DocumentSearch(docs_dir)
 
-# 起動時にモデルを確認・ダウンロード
-print("Ollamaモデルを確認しています...")
-print("※ モデルは一度ダウンロードされれば、次回以降は自動的に使用されます。")
-print("※ すべての処理はローカルで完結し、データは外部に送信されません。\n")
-try:
-    ollama_client.ensure_model()
-except Exception as e:
-    print(f"モデルの確認中にエラーが発生しました: {e}")
-    print("アプリケーションは続行しますが、モデルが利用できない可能性があります。")
+# 起動時にモデルを確認・ダウンロード（ローカル環境のみ）
+if not IS_VERCEL:
+    print("Ollamaモデルを確認しています...")
+    print("※ モデルは一度ダウンロードされれば、次回以降は自動的に使用されます。")
+    print("※ すべての処理はローカルで完結し、データは外部に送信されません。\n")
+    try:
+        ollama_client.ensure_model()
+    except Exception as e:
+        print(f"モデルの確認中にエラーが発生しました: {e}")
+        print("アプリケーションは続行しますが、モデルが利用できない可能性があります。")
+else:
+    print("Vercel環境: 外部Ollamaサーバーを使用します")
 
 @app.route('/')
 def index():
@@ -135,10 +149,11 @@ def get_document(filename):
     
     # セキュリティ: パストラバーサル攻撃を防ぐ
     filename = os.path.basename(filename)
-    filepath = os.path.join(docs_dir, filename)
+    current_docs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'docs')
+    filepath = os.path.join(current_docs_dir, filename)
     
     # 親ディレクトリへの移動を防ぐ
-    if not os.path.abspath(filepath).startswith(os.path.abspath(docs_dir)):
+    if not os.path.abspath(filepath).startswith(os.path.abspath(current_docs_dir)):
         return jsonify({'error': 'Invalid file path'}), 400
     
     if not os.path.exists(filepath):

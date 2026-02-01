@@ -4,11 +4,26 @@ import os
 import requests
 
 class OllamaClient:
-    def __init__(self, ollama_path):
+    def __init__(self, ollama_path=None, api_url=None):
+        """
+        初期化
+        
+        Args:
+            ollama_path: ローカルのOllama実行ファイルのパス（ローカル環境のみ）
+            api_url: Ollama APIのURL（デフォルト: http://localhost:11434）
+        """
         self.ollama_path = ollama_path
         self.model = "tinyllama"  # 軽量モデル（約637MB）
-        self.api_url = "http://localhost:11434/api/generate"  # OllamaのデフォルトAPI URL
-        self.list_url = "http://localhost:11434/api/tags"  # モデル一覧取得API
+        
+        # API URLの設定
+        if api_url:
+            base_url = api_url.rstrip('/')
+        else:
+            base_url = "http://localhost:11434"
+        
+        self.api_url = f"{base_url}/api/generate"
+        self.list_url = f"{base_url}/api/tags"
+        self.pull_url = f"{base_url}/api/pull"
         
     def _run_ollama(self, prompt, system_prompt=None):
         """Ollamaを実行してレスポンスを取得"""
@@ -111,9 +126,8 @@ class OllamaClient:
         print("（初回ダウンロードには数分かかる場合があります）\n")
         try:
             # HTTP APIでダウンロードを試みる
-            pull_url = "http://localhost:11434/api/pull"
             payload = {"name": model_name}
-            response = requests.post(pull_url, json=payload, stream=True, timeout=600)
+            response = requests.post(self.pull_url, json=payload, stream=True, timeout=600)
             
             if response.status_code == 200:
                 # ストリーミングレスポンスを処理
