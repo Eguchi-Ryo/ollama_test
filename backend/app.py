@@ -12,8 +12,15 @@ from document_search import DocumentSearch
 template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'template')
 static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
 
-app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir, static_url_path='/static')
 CORS(app)
+
+# 静的ファイルのルートを明示的に追加（Vercel対応）
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """静的ファイルを配信"""
+    from flask import send_from_directory
+    return send_from_directory(static_dir, filename)
 
 # 環境判定
 IS_VERCEL = os.getenv('VERCEL') == '1'
